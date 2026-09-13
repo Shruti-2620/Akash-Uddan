@@ -97,52 +97,66 @@ window.addEventListener('keyup', e => keys[e.key] = false);
 /* ------------------------------------------------------------
    THREE.JS SCENE
 ------------------------------------------------------------ */
-const COLOR_MAROON = 0x8c1d1d;
-const COLOR_MAROON_DARK = 0x5c1010;
-const COLOR_GOLD = 0xd9a62e;
-const COLOR_GOLD_LIGHT = 0xf2cf6b;
-const COLOR_TEAL = 0x1f6f54;
-const COLOR_TEAL_DARK = 0x123f30;
-const COLOR_INDIGO = 0x392e6e;
+const COLOR_RED = 0xe0362a;
+const COLOR_RED_DARK = 0xa01f18;
+const COLOR_GOLD = 0xf4c430;
+const COLOR_GOLD_LIGHT = 0xffdb70;
+const COLOR_BLUE = 0x2f6fb0;
+const COLOR_BLUE_DARK = 0x1c4a7a;
+const COLOR_NAVY = 0x12182b;
 const COLOR_CREAM = 0xf4ead0;
-const COLOR_INK = 0x1a1408;
+const COLOR_INK = 0x0a0e1c;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x4a3a68, 60, 420);
+scene.fog = new THREE.Fog(0x1c1f3a, 60, 420);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
-// Sky as a big gradient-painted sphere, folk-poster dusk colors
+// Sky as a big gradient-painted sphere, atomic-poster midnight colors,
+// plus a scatter of stars — like the night sky behind the rocket in
+// the reference poster.
 function makeSkyDome() {
   const canvas = document.createElement('canvas');
-  canvas.width = 2; canvas.height = 256;
+  canvas.width = 256; canvas.height = 256;
   const ctx = canvas.getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, 256);
-  grad.addColorStop(0, '#241d4a');
-  grad.addColorStop(0.5, '#4a3a68');
-  grad.addColorStop(0.8, '#8c1d1d');
-  grad.addColorStop(1, '#d9a62e');
-  ctx.fillStyle = grad; ctx.fillRect(0, 0, 2, 256);
+  grad.addColorStop(0, '#0a0e1c');
+  grad.addColorStop(0.45, '#12182b');
+  grad.addColorStop(0.75, '#1c2a4a');
+  grad.addColorStop(1, '#2f6fb0');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 256, 256);
+
+  // scattered stars, gold and cream like the poster's star field
+  ctx.fillStyle = '#f4c430';
+  for (let i = 0; i < 90; i++) {
+    const x = Math.random() * 256;
+    const y = Math.random() * 180;
+    const r = Math.random() < 0.15 ? 1.6 : 0.8;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   const tex = new THREE.CanvasTexture(canvas);
-  const geo = new THREE.SphereGeometry(500, 16, 16);
+  const geo = new THREE.SphereGeometry(500, 24, 24);
   const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false });
   scene.add(new THREE.Mesh(geo, mat));
 }
 makeSkyDome();
 
-const hemi = new THREE.HemisphereLight(0xffdf9e, 0x2a1f3d, 0.95);
+const hemi = new THREE.HemisphereLight(0xdfe8ff, 0x141a2e, 0.9);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffe0b0, 0.85);
+const sun = new THREE.DirectionalLight(0xffe9b0, 0.85);
 sun.position.set(-80, 120, -60);
 scene.add(sun);
 
 // Ground
 const ground = new THREE.Mesh(
   new THREE.PlaneGeometry(4000, 4000),
-  new THREE.MeshStandardMaterial({ color: COLOR_TEAL_DARK })
+  new THREE.MeshStandardMaterial({ color: COLOR_BLUE_DARK })
 );
 ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0;
@@ -158,11 +172,11 @@ function addBlackEdges(mesh) {
   mesh.add(line);
 }
 
-/* ---- Plane (simple stylised low-poly craft, folk-art palette) ---- */
+/* ---- Plane (simple stylised low-poly craft, atomic rocket palette) ---- */
 const plane = new THREE.Group();
-const bodyMat = new THREE.MeshStandardMaterial({ color: COLOR_GOLD, metalness: 0.2, roughness: 0.5 });
-const wingMat = new THREE.MeshStandardMaterial({ color: COLOR_TEAL, metalness: 0.1, roughness: 0.6 });
-const tailMat = new THREE.MeshStandardMaterial({ color: COLOR_MAROON, metalness: 0.1, roughness: 0.6 });
+const bodyMat = new THREE.MeshStandardMaterial({ color: COLOR_RED, metalness: 0.2, roughness: 0.5 });
+const wingMat = new THREE.MeshStandardMaterial({ color: COLOR_BLUE, metalness: 0.1, roughness: 0.6 });
+const tailMat = new THREE.MeshStandardMaterial({ color: COLOR_GOLD, metalness: 0.1, roughness: 0.6 });
 
 const fuselage = new THREE.Mesh(new THREE.ConeGeometry(1, 4.5, 8), bodyMat);
 fuselage.rotation.x = Math.PI / 2;
@@ -220,10 +234,10 @@ function makeBandedTexture(baseColor, bandColor) {
 }
 
 const buildingPalettes = [
-  ['#8c1d1d', '#d9a62e'],
-  ['#1f6f54', '#f2cf6b'],
-  ['#392e6e', '#d9a62e'],
-  ['#5c1010', '#1f6f54']
+  ['#e0362a', '#f4c430'],
+  ['#2f6fb0', '#ffdb70'],
+  ['#12182b', '#f4c430'],
+  ['#a01f18', '#2f6fb0']
 ];
 const buildingMats = buildingPalettes.map(([base, band]) => {
   const tex = makeBandedTexture(base, band);
