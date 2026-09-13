@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Skyline Runner — Tilt Flight</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root{
+    --dusk-top:#1b1440;
+    --dusk-mid:#5b3a6e;
+    --dusk-bottom:#e8734f;
+    --panel:#14102bcc;
+    --ink:#f4ecff;
+    --accent:#ffb454;
+    --danger:#ff5d5d;
+    --ok:#5de6a3;
+  }
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);}
+  canvas{display:block;}
+
+  #hud{
+    position:fixed;top:16px;left:16px;right:16px;
+    display:flex;justify-content:space-between;align-items:flex-start;
+    pointer-events:none;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid #ffffff22;
+    border-radius:10px;
+    padding:10px 16px;
+    backdrop-filter:blur(6px);
+    pointer-events:auto;
+  }
+  #status{display:flex;gap:10px;align-items:center;font-size:14px;}
+  #dot{width:9px;height:9px;border-radius:50%;background:var(--danger);}
+  #dot.connected{background:var(--ok);}
+  #stats{display:flex;gap:22px;font-size:14px;}
+  #stats b{font-size:20px;display:block;color:var(--accent);font-weight:600;}
+  #stats span{opacity:.7;font-size:11px;letter-spacing:.03em;}
+
+  #controls{display:flex;gap:8px;}
+  button{
+    background:var(--accent);color:#241505;border:none;border-radius:8px;
+    padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  button.secondary{background:#ffffff1a;color:var(--ink);border:1px solid #ffffff33;}
+  button:disabled{opacity:.4;cursor:default;}
+
+  #tiltmeter{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    display:flex;gap:14px;align-items:center;
+  }
+  .bar-wrap{width:150px;height:8px;background:#ffffff22;border-radius:4px;position:relative;overflow:hidden;}
+  .bar-mid{position:absolute;left:50%;top:0;bottom:0;width:2px;background:#ffffff55;}
+  .bar-fill{position:absolute;top:0;bottom:0;background:var(--accent);border-radius:4px;}
+
+  #msg{
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    text-align:center;pointer-events:none;
+  }
+  #msg h1{font-size:34px;margin:0 0 8px;font-weight:700;}
+  #msg p{margin:0;opacity:.75;font-size:15px;}
+
+  #crash{display:none;}
+  #crash h1{color:var(--danger);}
+
+  .hint{position:fixed;bottom:20px;right:16px;font-size:12px;opacity:.55;text-align:right;}
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="card">
+    <div id="status"><span id="dot"></span><span id="statusText">Not connected</span></div>
+  </div>
+  <div class="card" id="controls">
+    <button id="connectBtn">Connect ESP32</button>
+    <button id="recenterBtn" class="secondary" disabled>Recenter</button>
+  </div>
+</div>
+
+<div class="card" style="position:fixed;top:76px;left:16px;" id="statsCard">
+  <div id="stats">
+    <div><b id="scoreVal">0</b><span>DISTANCE (m)</span></div>
+    <div><b id="speedVal">0</b><span>SPEED</span></div>
+    <div><b id="altVal">0</b><span>ALTITUDE</span></div>
+  </div>
+</div>
+
+<div id="tiltmeter">
+  <div class="bar-wrap"><div class="bar-mid"></div><div class="bar-fill" id="rollBar"></div></div>
+  <div class="bar-wrap"><div class="bar-mid"></div><div class="bar-fill" id="pitchBar"></div></div>
+</div>
+
+<div id="msg">
+  <h1>Skyline Runner</h1>
+  <p>Connect your ESP32 controller and tilt it to fly — bank left/right,<br>
+  nose up/down to climb or dive. No controller? Use the arrow keys.</p>
+</div>
+
+<div id="msg" id="crash" style="display:none;">
+  <h1>Crashed</h1>
+  <p id="crashScore"></p>
+  <p style="margin-top:10px;">Press SPACE to try again</p>
+</div>
+
+<div class="hint">Arrow keys / WASD also work · Space to restart after a crash</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ---------------------------------------------------------------------
+   BLUETOOTH — must match the UUIDs in esp32_ble_tilt_controller.ino
+--------------------------------------------------------------------- */
+const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+const CHAR_UUID     = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+let liveRoll = 0, livePitch = 0;   // raw values from the controller
+let targetRoll = 0, targetPitch = 0; // smoothed, used to fly the plane
+let bleConnected = false;
+let bleDevice, bleChar;
+
+const dot = document.getElementById('dot');
+const statusText = document.getElementById('statusText');
+const connectBtn = document.getElementById('connectBtn');
+const recenterBtn = document.getElementById('recenterBtn');
+let rollZero = 0, pitchZero = 0;
+
+async function connectBLE(){
+  if(!navigator.bluetooth){
+    alert("Web Bluetooth isn't available in this browser. Use Chrome or Edge on desktop or Android, and open this file directly (not through another app's preview).");
+    return;
+  }
+  try{
+    statusText.textContent = "Requesting device…";
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [SERVICE_UUID] }]
+    });
+    bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+    statusText.textContent = "Connecting…";
+    const server = await bleDevice.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    bleChar = await service.getCharacteristic(CHAR_UUID);
+    await bleChar.startNotifications();
+    bleChar.addEventListener('characteristicvaluechanged', onTiltData);
+
+    bleConnected = true;
+    dot.classList.add('connected');
+    statusText.textContent = "Connected: " + (bleDevice.name || "ESP32");
+    connectBtn.textContent = "Disconnect";
+    recenterBtn.disabled = false;
+  }catch(err){
+    console.error(err);
+    statusText.textContent = "Connection failed";
+    setTimeout(()=>{ if(!bleConnected) statusText.textContent = "Not connected"; }, 2500);
+  }
+}
+
+function onDisconnected(){
+  bleConnected = false;
+  dot.classList.remove('connected');
+  statusText.textContent = "Disconnected";
+  connectBtn.textContent = "Connect ESP32";
+  recenterBtn.disabled = true;
+}
+
+function onTiltData(event){
+  const text = new TextDecoder().decode(event.target.value);
+  const parts = text.split(',');
+  if(parts.length === 2){
+    liveRoll = parseFloat(parts[0]);
+    livePitch = parseFloat(parts[1]);
+  }
+}
+
+connectBtn.addEventListener('click', () => {
+  if(bleConnected && bleDevice){ bleDevice.gatt.disconnect(); }
+  else connectBLE();
+});
+recenterBtn.addEventListener('click', () => {
+  rollZero = liveRoll; pitchZero = livePitch;
+});
+
+/* ---------------------------------------------------------------------
+   KEYBOARD FALLBACK (works with or without the ESP32)
+--------------------------------------------------------------------- */
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if(e.key === ' ' && crashed) restart();
+});
+window.addEventListener('keyup', e => keys[e.key] = false);
+
+/* ---------------------------------------------------------------------
+   THREE.JS SCENE
+--------------------------------------------------------------------- */
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x5b3a6e, 60, 420);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+// Sky as a big gradient-painted sphere
+function makeSkyDome(){
+  const canvas = document.createElement('canvas');
+  canvas.width = 2; canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0,0,0,256);
+  grad.addColorStop(0, '#1b1440');
+  grad.addColorStop(0.55, '#5b3a6e');
+  grad.addColorStop(1, '#e8734f');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,2,256);
+  const tex = new THREE.CanvasTexture(canvas);
+  const geo = new THREE.SphereGeometry(500, 16, 16);
+  const mat = new THREE.MeshBasicMaterial({ map:tex, side:THREE.BackSide, fog:false });
+  scene.add(new THREE.Mesh(geo, mat));
+}
+makeSkyDome();
+
+const hemi = new THREE.HemisphereLight(0xffcf9e, 0x2a1f3d, 0.9);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffe0b0, 0.8);
+sun.position.set(-80, 120, -60);
+scene.add(sun);
+
+// Ground
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(4000, 4000),
+  new THREE.MeshStandardMaterial({ color: 0x2a2140 })
+);
+ground.rotation.x = -Math.PI/2;
+ground.position.y = 0;
+scene.add(ground);
+
+/* ---- Plane (simple stylised low-poly craft) ---- */
+const plane = new THREE.Group();
+const bodyMat = new THREE.MeshStandardMaterial({ color:0xffb454, metalness:0.3, roughness:0.4 });
+const wingMat = new THREE.MeshStandardMaterial({ color:0xf4ecff, metalness:0.2, roughness:0.5 });
+
+const fuselage = new THREE.Mesh(new THREE.ConeGeometry(1, 4.5, 8), bodyMat);
+fuselage.rotation.x = Math.PI/2;
+plane.add(fuselage);
+
+const wing = new THREE.Mesh(new THREE.BoxGeometry(7, 0.15, 1.4), wingMat);
+wing.position.z = 0.2;
+plane.add(wing);
+
+const tailWing = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.12, 0.8), wingMat);
+tailWing.position.set(0, 0.2, 1.9);
+plane.add(tailWing);
+
+const tailFin = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.1, 1), bodyMat);
+tailFin.position.set(0, 0.6, 1.9);
+plane.add(tailFin);
+
+plane.position.set(0, 40, 0);
+scene.add(plane);
+
+// Camera rig — chases behind the plane
+const camRig = new THREE.Object3D();
+scene.add(camRig);
+const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 1000);
+
+/* ---- Buildings (procedural, recycled as the plane flies forward) ---- */
+const LANE_WIDTH = 240;
+const SEGMENT_LEN = 60;
+const SEGMENTS_AHEAD = 14;
+const buildingMats = [0x3a2f55, 0x4a3a68, 0x2f2a48, 0x5a4270].map(c =>
+  new THREE.MeshStandardMaterial({ color:c, metalness:0.1, roughness:0.8 })
+);
+const winMat = new THREE.MeshBasicMaterial({ color:0xffd98a });
+
+const buildings = []; // { mesh, box3 }
+const buildingGeo = new THREE.BoxGeometry(1,1,1);
+
+function spawnBuildingAt(z){
+  const count = 2 + Math.floor(Math.random()*2);
+  for(let i=0;i<count;i++){
+    const w = 8 + Math.random()*14;
+    const d = 8 + Math.random()*14;
+    const h = 18 + Math.random()*70;
+    const x = (Math.random()-0.5) * LANE_WIDTH;
+    const mesh = new THREE.Mesh(buildingGeo, buildingMats[Math.floor(Math.random()*buildingMats.length)]);
+    mesh.scale.set(w, h, d);
+    mesh.position.set(x, h/2, z + (Math.random()-0.5)*SEGMENT_LEN*0.6);
+
+    // simple lit-window strip using emissive-ish flat plane
+    if(Math.random() < 0.85){
+      const winPlane = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.7), winMat);
+      winPlane.position.set(0, 0.15, 0.51);
+      mesh.add(winPlane);
+    }
+
+    scene.add(mesh);
+    const box = new THREE.Box3().setFromObject(mesh);
+    buildings.push({ mesh, box, z: mesh.position.z });
+  }
+}
+
+let furthestZ = 0;
+for(let i=0;i<SEGMENTS_AHEAD;i++){
+  furthestZ -= SEGMENT_LEN;
+  spawnBuildingAt(furthestZ);
+}
+
+function recycleBuildings(planeZ){
+  while(buildings.length && buildings[0].z > planeZ + SEGMENT_LEN*2){
+    scene.remove(buildings[0].mesh);
+    buildings.shift();
+  }
+  while(furthestZ > planeZ - SEGMENT_LEN*SEGMENTS_AHEAD){
+    furthestZ -= SEGMENT_LEN;
+    spawnBuildingAt(furthestZ);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   FLIGHT MODEL
+--------------------------------------------------------------------- */
+let speed = 24;          // forward units/sec, ramps up slowly
+const MAX_SPEED = 60;
+let bankAngle = 0;       // radians, visual + turn rate
+let pitchAngleVisual = 0;
+let distance = 0;
+let crashed = false;
+const planeBox = new THREE.Box3();
+const planeSize = new THREE.Vector3(3.5, 1.6, 3.5);
+
+function getControlInputs(){
+  // Prefer live BLE tilt data; fall back to keyboard.
+  let roll = 0, pitch = 0;
+  if(bleConnected){
+    roll = liveRoll - rollZero;
+    pitch = livePitch - pitchZero;
+  } else {
+    if(keys['ArrowLeft'] || keys['a']) roll = -22;
+    if(keys['ArrowRight'] || keys['d']) roll = 22;
+    if(keys['ArrowUp'] || keys['w']) pitch = -18;
+    if(keys['ArrowDown'] || keys['s']) pitch = 18;
+  }
+  // clamp to a sane flying range
+  roll = Math.max(-45, Math.min(45, roll));
+  pitch = Math.max(-35, Math.min(35, pitch));
+  return { roll, pitch };
+}
+
+function updateHUDMeters(roll, pitch){
+  const rollPct = 50 + (roll/45)*50;
+  const pitchPct = 50 + (pitch/35)*50;
+  document.getElementById('rollBar').style.left = Math.min(rollPct,50) + '%';
+  document.getElementById('rollBar').style.width = Math.abs(rollPct-50) + '%';
+  document.getElementById('pitchBar').style.left = Math.min(pitchPct,50) + '%';
+  document.getElementById('pitchBar').style.width = Math.abs(pitchPct-50) + '%';
+}
+
+function restart(){
+  crashed = false;
+  document.getElementById('crash').style.display = 'none';
+  plane.position.set(0, 40, 0);
+  speed = 24;
+  distance = 0;
+  buildings.forEach(b => scene.remove(b.mesh));
+  buildings.length = 0;
+  furthestZ = 0;
+  for(let i=0;i<SEGMENTS_AHEAD;i++){ furthestZ -= SEGMENT_LEN; spawnBuildingAt(furthestZ); }
+}
+
+const clock = new THREE.Clock();
+document.getElementById('msg').style.display = 'block';
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if(!crashed){
+    const { roll, pitch } = getControlInputs();
+    targetRoll += (roll - targetRoll) * Math.min(1, dt*4);
+    targetPitch += (pitch - targetPitch) * Math.min(1, dt*4);
+    updateHUDMeters(targetRoll, targetPitch);
+
+    if(document.getElementById('msg').style.display !== 'none' && (Math.abs(targetRoll) > 3 || Math.abs(targetPitch) > 3 || keys['ArrowUp'] || keys['ArrowLeft'] || keys['ArrowRight'] || keys['ArrowDown']) ){
+      document.getElementById('msg').style.display = 'none';
+    }
+
+    speed = Math.min(MAX_SPEED, speed + dt*1.2);
+
+    // Bank steers left/right; pitch changes climb rate
+    bankAngle = THREE.MathUtils.degToRad(targetRoll);
+    pitchAngleVisual = THREE.MathUtils.degToRad(-targetPitch);
+
+    const turnRate = -bankAngle * 1.4; // banking yaws the plane, like a real turn
+    plane.rotation.z = -bankAngle;
+    plane.rotation.x = pitchAngleVisual;
+    plane.rotation.y += turnRate * dt;
+
+    const forward = new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(0, plane.rotation.y, 0));
+    plane.position.addScaledVector(forward, speed*dt);
+    plane.position.y += (targetPitch * -0.28) * dt * (speed/24);
+    plane.position.y = Math.max(6, Math.min(160, plane.position.y));
+    plane.position.x = Math.max(-LANE_WIDTH*0.65, Math.min(LANE_WIDTH*0.65, plane.position.x));
+
+    distance += speed*dt;
+    recycleBuildings(plane.position.z);
+
+    // Collision check
+    planeBox.setFromCenterAndSize(plane.position, planeSize);
+    for(const b of buildings){
+      if(Math.abs(b.z - plane.position.z) > 40) continue;
+      if(planeBox.intersectsBox(b.box)){
+        crashed = true;
+        document.getElementById('crash').style.display = 'block';
+        document.getElementById('crashScore').textContent = `Distance: ${Math.floor(distance)}m`;
+        break;
+      }
+    }
+
+    // Camera chase
+    const camOffset = new THREE.Vector3(0, 6, 14).applyEuler(new THREE.Euler(0, plane.rotation.y, 0));
+    camera.position.lerp(new THREE.Vector3().copy(plane.position).add(camOffset), 1 - Math.pow(0.001, dt));
+    const lookTarget = new THREE.Vector3().copy(plane.position).add(
+      new THREE.Vector3(0,2,-10).applyEuler(new THREE.Euler(0, plane.rotation.y, 0))
+    );
+    camera.lookAt(lookTarget);
+
+    document.getElementById('scoreVal').textContent = Math.floor(distance);
+    document.getElementById('speedVal').textContent = Math.floor(speed);
+    document.getElementById('altVal').textContent = Math.floor(plane.position.y);
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+:root{
+  /* retro atomic / jet-age poster palette */
+  --navy:#12182b;
+  --navy-dark:#0a0e1c;
+  --red:#e0362a;
+  --red-dark:#a01f18;
+  --gold:#f4c430;
+  --gold-light:#ffdb70;
+  --blue:#2f6fb0;
+  --blue-dark:#1c4a7a;
+  --cream:#f4ead0;
+  --ink:#0a0e1c;
+  --danger:#e0362a;
+  --ok:#2f6fb0;
+}
+
+html,body{
+  margin:0;height:100%;overflow:hidden;background:var(--navy-dark);
+  font-family:'Poppins','Segoe UI',system-ui,-apple-system,sans-serif;
+  color:var(--cream);
+}
+canvas{display:block;}
+
+/* ---------- HUD ---------- */
+
+#hud{
+  position:fixed;top:16px;left:16px;right:16px;
+  display:flex;justify-content:space-between;align-items:flex-start;
+  pointer-events:none;
+}
+
+.card{
+  background:var(--cream);
+  border:3px solid var(--ink);
+  border-radius:8px;
+  padding:8px 14px;
+  color:var(--navy);
+  pointer-events:auto;
+  box-shadow:4px 4px 0 rgba(0,0,0,0.45);
+}
+
+#status{display:flex;gap:10px;align-items:center;font-size:13px;font-weight:600;}
+#dot{width:10px;height:10px;border-radius:50%;background:var(--danger);border:2px solid var(--ink);}
+#dot.connected{background:var(--ok);}
+
+#controls{display:flex;gap:8px;}
+button{
+  background:var(--gold);color:var(--ink);border:2px solid var(--ink);border-radius:6px;
+  padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;
+  font-family:inherit;
+}
+button.secondary{background:var(--blue);color:var(--cream);}
+button:disabled{opacity:.4;cursor:default;}
+button:hover:not(:disabled){transform:translateY(-1px);}
+button:active:not(:disabled){transform:translateY(1px);}
+
+#statsCard{position:fixed;top:72px;left:16px;}
+#stats{display:flex;gap:20px;}
+#stats b{font-size:19px;display:block;color:var(--red);font-weight:700;}
+#stats span{opacity:.75;font-size:10px;letter-spacing:.04em;}
+
+/* ---------- Tilt meter ---------- */
+
+#tiltmeter{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  display:flex;gap:10px;align-items:center;
+  background:var(--cream);border:3px solid var(--ink);border-radius:8px;
+  padding:8px 14px;box-shadow:4px 4px 0 rgba(0,0,0,0.45);
+}
+.meter-label{font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--navy);}
+.bar-wrap{width:130px;height:8px;background:rgba(0,0,0,0.15);border-radius:4px;position:relative;overflow:hidden;border:1px solid var(--ink);}
+.bar-mid{position:absolute;left:50%;top:0;bottom:0;width:2px;background:rgba(0,0,0,0.4);}
+.bar-fill{position:absolute;top:0;bottom:0;background:var(--blue);border-radius:4px;}
+
+/* ---------- Messages ---------- */
+
+#msg, #crash{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;pointer-events:none;
+  background:var(--navy-dark);border:3px solid var(--gold);border-radius:10px;
+  padding:26px 34px;max-width:480px;
+  box-shadow:6px 6px 0 rgba(0,0,0,0.5);
+}
+#msg h1, #crash h1{
+  font-family:'Bangers',cursive;
+  font-size:3rem;
+  letter-spacing:1px;
+  margin:0 0 4px;
+  font-weight:400;
+  color:var(--red);
+  -webkit-text-stroke:2px var(--ink);
+  text-shadow:3px 3px 0 var(--ink);
+}
+#msg .tagline{
+  color:var(--gold-light);
+  font-weight:700;
+  font-size:13px;
+  letter-spacing:.04em;
+  margin:0 0 14px;
+}
+#msg p, #crash p{margin:0;opacity:.92;font-size:14px;line-height:1.5;color:var(--cream);}
+#crash h1{color:var(--gold);}
+.hidden{display:none;}
+
+/* ---------- Level up banner ---------- */
+
+#levelUpBanner{
+  position:fixed;top:38%;left:50%;transform:translate(-50%,-50%) scale(1);
+  font-family:'Bangers',cursive;
+  font-size:3rem;
+  letter-spacing:1px;
+  color:var(--gold);
+  -webkit-text-stroke:2px var(--ink);
+  text-shadow:4px 4px 0 var(--ink);
+  pointer-events:none;
+  animation:levelPop 1.1s ease forwards;
+}
+#levelUpBanner.hidden{display:none;}
+@keyframes levelPop{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(0.6);}
+  20%{opacity:1;transform:translate(-50%,-50%) scale(1.15);}
+  70%{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  100%{opacity:0;transform:translate(-50%,-60%) scale(1);}
+}
+
+.hint{position:fixed;bottom:20px;right:16px;font-size:11px;opacity:.7;text-align:right;color:var(--cream);}
+
+@media (max-width:560px){
+  #stats{gap:12px;}
+  #msg, #crash{padding:18px 20px;}
+  #msg h1, #crash h1{font-size:2.1rem;}
+}
