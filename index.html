@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Aakash Udaan — Tilt Flight</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="hud">
+  <div class="card">
+    <div id="status"><span id="dot"></span><span id="statusText">Not connected</span></div>
+  </div>
+  <div class="card" id="controls">
+    <button id="connectBtn">Connect ESP32</button>
+    <button id="recenterBtn" class="secondary" disabled>Recenter</button>
+  </div>
+</div>
+
+<div class="card" id="statsCard">
+  <div id="stats">
+    <div><b id="scoreVal">0</b><span>DISTANCE (m)</span></div>
+    <div><b id="speedVal">0</b><span>SPEED</span></div>
+    <div><b id="altVal">0</b><span>ALTITUDE</span></div>
+    <div><b id="levelVal">1</b><span>LEVEL</span></div>
+  </div>
+</div>
+
+<div id="tiltmeter">
+  <span class="meter-label">ROLL</span>
+  <div class="bar-wrap"><div class="bar-mid"></div><div class="bar-fill" id="rollBar"></div></div>
+  <div class="bar-wrap"><div class="bar-mid"></div><div class="bar-fill" id="pitchBar"></div></div>
+  <span class="meter-label">PITCH</span>
+</div>
+
+<div id="levelUpBanner" class="hidden">Level Up!</div>
+
+<div id="msg">
+  <h1>Aakash Udaan</h1>
+  <p>Connect your ESP32 controller and tilt it to fly — bank left/right to steer,<br>
+  nose up/down to climb or dive. No controller? Use the arrow keys or WASD.</p>
+</div>
+
+<div id="crash" class="hidden">
+  <h1>Crashed</h1>
+  <p id="crashScore"></p>
+  <p style="margin-top:10px;">Press SPACE to try again</p>
+</div>
+
+<div class="hint">Arrow keys / WASD also work &middot; Space to restart after a crash</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
