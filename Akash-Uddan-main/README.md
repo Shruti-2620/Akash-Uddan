@@ -1,51 +1,104 @@
-# Aakash Udaan — tilt-flight game (roll + pitch, like a real plane)
+# AAKASH UDAAN — Pixel Flight Lab
 
-A 3D endless flight game in the flat-color, thick-outline folk-art
-style, controlled by tilting an ESP32 board — bank left/right to
-turn, nose up/down to climb or dive.
+An original 1980s-style pixel arcade flight game, controlled by tilting a
+real **ESP32 + MPU6050** motion controller over Bluetooth, that quietly
+teaches how flight works along the way.
 
-## Files
+> Educational prototype and arcade game. Not a certified flight simulator,
+> not a professional training device, and not a medical tool.
 
-- `index.html`, `style.css`, `game.js` — the game itself (uses
-  Three.js from a CDN, no build step needed). Open `index.html` in
-  a browser to fly with arrow keys / WASD right away.
-- `esp32_ble_firmware.ino` — Arduino sketch for the ESP32 + MPU6050
-  tilt sensor. It advertises over Bluetooth Low Energy and notifies
-  roll/pitch to the browser.
+## Run it
 
-## Playing with just a keyboard (no hardware needed)
+1. Open `index.html` in **Chrome or Edge** (desktop or Android). Web
+   Bluetooth does not work in Firefox or iOS Safari. No build step, no
+   server, no install.
+2. Press any key → title screen → **START**.
+3. **START** takes you through AIRCRAFT → THEME → CONTROLLER CHECK → LEVEL 1.
 
-Open `index.html` in a browser (Chrome or Edge). Use:
-- **← / →** or **A / D** to bank and turn
-- **↑ / ↓** or **W / S** to pitch up/down (dive/climb)
-- **Space** to restart after a crash
+No controller? The arrow keys / WASD fly the plane automatically while no
+ESP32 is connected.
 
-## Playing with the ESP32 tilt sensor
+## Connecting the ESP32 controller
 
-**Wiring** (MPU6050 → ESP32):
-- VCC → 3V3
-- GND → GND
-- SCL → GPIO 22
-- SDA → GPIO 21
+Nothing changed on the hardware side. Upload `esp32_ble_firmware.ino`
+unchanged.
 
-**Arduino IDE setup:**
-1. Install the ESP32 board package if you haven't already (the BLE
-   libraries used here ship with it — no extra install needed).
-2. Upload `esp32_ble_firmware.ino` to your ESP32.
-3. Open the Serial Monitor at 115200 baud to confirm it's advertising
-   as `AakashUdaan-Controller`.
+**Wiring (MPU6050 → ESP32):** VCC → 3V3 · GND → GND · SCL → GPIO 22 · SDA → GPIO 21
 
-**Connecting the game to the board:**
-1. Open `index.html` in Chrome or Edge (desktop or Android — Web
-   Bluetooth doesn't work on iOS Safari).
-2. Click **Connect ESP32** and pick `AakashUdaan-Controller` from
-   the browser's device picker.
-3. Hold the board level and click **Recenter** once to zero it out,
-   then tilt to fly.
+1. Power the controller. The firmware advertises as `AtomicAce-Controller`.
+2. Click **CONNECT ESP32** on the cabinet deck (or on the CONTROLLER CHECK
+   screen) and pick the controller in the browser's device list.
+3. Hold it level and click **RECENTER**.
+4. Tilt to fly: **roll** banks and steers, **pitch** climbs and dives.
 
-## Difficulty
+The Bluetooth code in `js/ble.js` is the original code copied line for line:
+same service UUID `4fafc201-1fb5-459e-8fcc-c5c9c331914b`, same characteristic
+UUID `beb5483e-36e1-4688-b7f5-ea07361b26a8`, same service-UUID device filter,
+same notifications, same `"roll,pitch"` text parsing, same Recenter zeroing.
 
-Every 400 meters flown, the level goes up: the flyable lane narrows,
-more buildings spawn per stretch, and the top speed cap rises — the
-same "gets harder as you go" feel as an endless runner, applied to
-a flight sim instead of lane-switching.
+## Controls
+
+| Input | Action |
+|---|---|
+| Tilt left / right | Bank + steer |
+| Tilt forward / back | Dive / climb (invert on CONTROLLER CHECK) |
+| Arrows / WASD | Fly (only while no controller is connected) |
+| Enter / Space | Select |
+| Esc | Back / pause |
+| P | Pause |
+| M | Sound on/off |
+| F | Fullscreen |
+| Tilt right and hold ~1 s | Confirm cards without touching the keyboard |
+
+## Levels
+
+| # | Level | Introduces |
+|---|---|---|
+| 1 | Basic Flight | Roll, pitch, flight corridor, rings |
+| 2 | Speed | Rising speed, tower obstacles, reaction time |
+| 3 | Altitude | Solid ground, terrain ridges, walls with gaps |
+| 4 | Stability | Turbulence gusts, moving drones and balloons |
+| 5 | Aerodynamics | Lift / weight / thrust / drag model with thrust rings and drag clouds |
+| 6 | Focus | Narrow corridor, precision rings, focus meter for smooth control |
+| 7 | Storm Front | Final challenge: fly through 10 storm gates to break the storm |
+
+## Crash = full reset
+
+Towers, walls, terrain and (from Level 3) the ground are solid. Hitting one
+ends the run. Drones, balloons and lightning cost a ♥, and losing the last ♥
+also ends the run. A SHIELD power-up absorbs one hit.
+
+After the explosion and CRASHED screen, **PRESS START** creates a brand-new
+run. Score, level, lives, obstacles, power-ups, timers and this run's
+lessons all start from zero at Level 1.
+
+## Project structure
+
+```
+index.html          cabinet layout + script order
+style.css           arcade cabinet, CRT overlay, menus
+game.js             state machine + main loop
+js/ble.js           ORIGINAL Web Bluetooth code (do not edit)
+js/core.js          namespace, constants, math helpers
+js/input.js         BLE / keyboard → smoothed flight input
+js/player.js        flight model
+js/world.js         runs, level spawning patterns, particles
+js/collision.js     collision checks → events
+js/levels.js        level + power-up data
+js/renderer.js      Canvas 2D pseudo-3D renderer + HUD
+js/sprites.js       aircraft data + pixel sprites
+js/font.js          5x7 bitmap font for the HUD
+js/themes.js        colour themes
+js/education.js     lesson cards, Flight School, data chip facts
+js/achievements.js  achievement list
+js/sound.js         Web Audio chiptune effects
+js/storage.js       localStorage: high scores, unlocks, settings
+esp32_ble_firmware.ino   controller firmware (unchanged)
+```
+
+## Unlocks
+
+- **FALCON:** reach Level 3 · **ARROW:** reach Level 5
+- **MONO GREEN theme:** collect 100 stars · **SUNSET ARCADE theme:** reach Level 4
+- **Exhibition mode:** on the title screen, enter ↑ ↑ ↓ ↓ ← → ← → B A to
+  unlock everything (enter it again to undo).
