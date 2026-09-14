@@ -2,55 +2,68 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Aakash Udaan — Tilt Flight</title>
+<title>AAKASH UDAAN — Pixel Flight Lab</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Pixel fonts for the menus (the in-game HUD uses a built-in bitmap font, so it works offline too) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body data-state="BOOT">
 
-<div id="hud">
-  <div class="card">
+<div id="cabinet">
+  <!-- Cabinet marquee -->
+  <header class="marquee">
+    <h1>AAKASH UDAAN</h1>
+    <p>PIXEL FLIGHT LAB</p>
+  </header>
+
+  <!-- CRT screen: .stage takes all free height, the bezel keeps 4:3 inside it -->
+  <div class="stage">
+    <div class="bezel">
+      <div id="screen">
+        <canvas id="game" width="320" height="240"></canvas>
+        <div id="overlay"></div>
+        <div id="toasts"></div>
+        <div class="crt crt-scan"></div>
+        <div class="crt crt-vignette"></div>
+        <div class="crt crt-flicker"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Control deck: these element IDs are used by js/ble.js — keep them -->
+  <div class="deck">
     <div id="status"><span id="dot"></span><span id="statusText">Not connected</span></div>
-  </div>
-  <div class="card" id="controls">
-    <button id="connectBtn">Connect ESP32</button>
-    <button id="recenterBtn" class="secondary" disabled>Recenter</button>
-  </div>
-</div>
-
-<div class="card" id="statsCard">
-  <div id="stats">
-    <div><b id="scoreVal">0</b><span>DISTANCE (m)</span></div>
-    <div><b id="speedVal">0</b><span>SPEED</span></div>
-    <div><b id="altVal">0</b><span>ALTITUDE</span></div>
-    <div><b id="levelVal">1</b><span>LEVEL</span></div>
+    <div id="controls">
+      <button id="connectBtn">Connect ESP32</button>
+      <button id="recenterBtn" class="secondary" disabled>Recenter</button>
+      <button id="fullBtn" class="ghost">Fullscreen</button>
+    </div>
+    <div class="deck-hints">TILT / ARROWS FLY · ENTER SELECT · P PAUSE · M SOUND · F FULLSCREEN</div>
   </div>
 </div>
 
-<div id="tiltmeter">
-  <span class="meter-label">ROLL</span>
-  <div class="bar-wrap"><div class="bar-mid"></div><div class="bar-fill" id="rollBar"></div></div>
-  <div class="bar-wrap"><div class="bar-mid"></div><div class="bar-fill" id="pitchBar"></div></div>
-  <span class="meter-label">PITCH</span>
-</div>
-
-<div id="levelUpBanner" class="hidden">Level Up!</div>
-
-<div id="msg">
-  <h1>Aakash Udaan</h1>
-  <p>Connect your ESP32 controller and tilt it to fly — bank left/right to steer,<br>
-  nose up/down to climb or dive. No controller? Use the arrow keys or WASD.</p>
-</div>
-
-<div id="crash" class="hidden">
-  <h1>Crashed</h1>
-  <p id="crashScore"></p>
-  <p style="margin-top:10px;">Press SPACE to try again</p>
-</div>
-
-<div class="hint">Arrow keys / WASD also work &middot; Space to restart after a crash</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- 1. Bluetooth controller (unchanged original code) -->
+<script src="js/ble.js"></script>
+<!-- 2. Engine modules -->
+<script src="js/core.js"></script>
+<script src="js/font.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/themes.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/education.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/achievements.js"></script>
+<script src="js/input.js"></script>
+<script src="js/player.js"></script>
+<script src="js/world.js"></script>
+<script src="js/collision.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/ui.js"></script>
+<!-- 3. State machine + main loop -->
 <script src="game.js"></script>
 </body>
 </html>
